@@ -20,7 +20,7 @@ export const AuthProvider = ({ children }) => {
 
   const checkAuth = async () => {
     try {
-      const { data } = await axios.get("api/user/checkAuth");
+      const { data } = await axios.get("/api/user/checkAuth");
 
       if (data.success) {
         setAuthUser(data.user);
@@ -28,34 +28,37 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (error) {
       console.log(error.message);
-      toast.error(error.message);
+      toast.error(error.response?.data?.message || "Something went wrong");
     }
   };
 
-  const login = async (state, credentials) => {
-    try {
-      const { data } = await axios.post(`api/user/${state}`, credentials);
+const login = async (state, credentials) => {
+  try {
+    const { data } = await axios.post(`/api/user/${state}`, credentials);
 
-      console.log(data);
+    if (data.success && data.userData?._id) {
+      if (socket) socket.disconnect();
 
-      if (data.success && data.userData && data.userData._id) {
-        // Optional: disconnect existing socket before creating a new one
-        if (socket) socket.disconnect();
+      connectSocket(data.userData);
+      setAuthUser(data.userData);
+    axios.defaults.headers.common[
+  "Authorization"
+] = `Bearer ${data.userData.token}`;
+      setToken(data.userData.token);
+      localStorage.setItem("token", data.userData.token);
 
-        connectSocket(data.userData);
-        setAuthUser(data.userData);
-        axios.defaults.headers.common["token"] = data.userData.token;
-        setToken(data.userData.token);
-        localStorage.setItem("token", data.userData.token);
-        toast.success(data.message);
-      } else {
-        toast.error(data.message || "Login failed");
-      }
-    } catch (error) {
-      console.log(error.message);
-      toast.error(error.message);
+      toast.success(data.message);
+      return true; // ✅ IMPORTANT
+    } else {
+      toast.error(data.message || "Login failed");
+      return false;
     }
-  };
+  } catch (error) {
+    toast.error(error.response?.data?.message || "Login failed");
+    return false;
+  }
+};
+
 
   const logout = async () => {
     setAuthUser(null);
@@ -69,14 +72,14 @@ export const AuthProvider = ({ children }) => {
 
   const updateProfile = async (body) => {
     try {
-      const { data } = await axios.put("api/user/updateProfile", body);
+      const { data } = await axios.put("/api/user/updateProfile", body);
 
       if (data.success) {
         setAuthUser(data.user);
         toast.success("Profile updated successfully");
       }
     } catch (error) {
-      toast.error(error.message);
+      toast.error(error.response?.data?.message || "Something went wrong");
     }
   };
 
